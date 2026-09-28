@@ -1,0 +1,17 @@
+# A/B 运行环境：WSL 内共享 venv ~/venvs/gsb-farm（Python 3.12.14）
+# 本文件只是版本记录。运行时不要 pip install、不要联网，解释器统一用：
+#   ~/venvs/gsb-farm/bin/python -m pytest tests/ -q
+#
+# 直接依赖
+pydantic==2.9.2
+pytest==8.3.3
+#
+# 传递依赖（随上面两个包一起就绪，不需要单独安装）
+annotated-types==0.8.0
+pydantic_core==2.23.4
+typing_extensions==4.16.0
+iniconfig==2.3.0
+packaging==26.3
+pluggy==1.6.0
+#
+# 标准库（无需安装）：sqlite3、json、os、datetime、typing、contextlib
