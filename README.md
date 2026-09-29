@@ -20,6 +20,14 @@ SQLite 文件里；铱星链路的回传任务从同一张表里取「待回传�
 - 读函数返回普通 dict，键名与列名一致；`transmitted` 是 Python bool。
 - 一份钻探日志的正文（现场数据、转写、气候事件）和它的摘要、样品分配方案，
   在现场系统里是分两步写进来的：先落正文，等 AI 摘要跑完再回写同一条 `log_id`。
+- `timestamp` 与 `transmission_time` 落库前统一归一化为定宽 UTC 文本
+  `YYYY-MM-DDTHH:MM:SS.ffffff`（微秒六位、不带时区后缀），使字典序等于时间序。
+  调用方可以传 `datetime` 对象或 ISO-8601 文本（`T` 或空格分隔、带或不带微秒、
+  带 `Z` / `+08:00` 等时区偏移）；**不带时区的输入一律按 UTC 处理**。
+  读路径不改写库里的历史文本，返回的 `timestamp` 仍是 str 或 None。
+- `save_drilling_log()` 对已存在的 `log_id` 只更新正文与摘要字段，
+  `transmitted` / `transmission_time` / `error_message` 三列保持原值；
+  回传状态只能由 `update_transmission_status()` 改变。
 
 ## 运行
 
@@ -29,4 +37,15 @@ SQLite 文件里；铱星链路的回传任务从同一张表里取「待回传�
 
 ### 本次做题人填写
 
-（把你自己拿主意的那一处写在这里：选了哪种做法、为什么不选另一种、代价是什么。）
+选择了第一种：`save_drilling_log` 彻底不碰回传三列——对已存在的 `log_id`，
+先读出该行的 `transmitted` / `transmission_time` / `error_message` 原值，
+`INSERT OR REPLACE` 时原样写回；新建 `log_id` 时才照调用方给的值落库。
+
+理由：现场系统的写路径是「先落正文、等摘要跑完再回写同一条 log_id」，回写时
+调用方手里根本没有回传状态，职责单一的接口让「补摘要」这个动作在语义上不可能
+弄丢回传结果，也不需要每个调用点都小心地区分「没传这个键」和「传了 False」。
+部分更新方案把正确性寄托在所有调用点都不漏传上，漏一处就会把已回传的记录
+静默改回未回传，正是这次铱星重复回传事故的根因，不能再留这个口子。
+
+代价：导入历史台账时，对已回传的记录要在 `save_drilling_log` 之外再调一次
+`update_transmission_status` 才能补上回传状态，是两步操作而不是一步到位。
