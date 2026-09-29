@@ -1,10 +1,10 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator, model_validator
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 
 
 class IceCoreData(BaseModel):
-    depth_meters: float
+    depth_meters: float = Field(ge=0)
     ice_temperature: float
     bubble_density: float
     co2_concentration: float
@@ -20,7 +20,13 @@ class TranscriptSegment(BaseModel):
     start_time: float
     end_time: float
     text: str
-    confidence: float
+    confidence: float = Field(ge=0, le=1)
+
+    @model_validator(mode='after')
+    def _end_not_before_start(self):
+        if self.end_time < self.start_time:
+            raise ValueError('end_time must not be earlier than start_time')
+        return self
 
 
 class ClimateEvent(BaseModel):
@@ -28,7 +34,7 @@ class ClimateEvent(BaseModel):
     description: str
     estimated_year: Optional[int] = None
     depth_reference: Optional[float] = None
-    confidence: float
+    confidence: float = Field(ge=0, le=1)
 
 
 class DrillingLog(BaseModel):
@@ -41,6 +47,13 @@ class DrillingLog(BaseModel):
     summary: Optional[str] = None
     sample_allocation: Optional[Dict[str, Any]] = None
     transmitted: bool = False
+
+    @field_validator('log_id')
+    @classmethod
+    def _log_id_not_blank(cls, value):
+        if not value.strip():
+            raise ValueError('log_id must be non-empty and not pure whitespace')
+        return value
 
 
 class AudioUploadResponse(BaseModel):
